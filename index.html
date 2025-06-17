@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Controle de Pedidos</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f9f9f9;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 20px;
+            border: none;
+            background-color: #007BFF;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .aba {
+            display: none;
+            margin-top: 20px;
+        }
+        .ativa {
+            display: block;
+        }
+        input, select {
+            margin: 5px 0;
+            padding: 8px;
+            width: 250px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #007BFF;
+            color: white;
+        }
+        .compact-table td, .compact-table th {
+            padding: 4px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Controle de Pedidos</h2>
+
+<div>
+    <button onclick="abrirAba('dashboard')">Dashboard</button>
+    <button onclick="abrirAba('cadastroPN')">Cadastro de PNs</button>
+    <button onclick="abrirAba('cadastroPedido')">Colocar Pedido</button>
+    <button onclick="abrirAba('finalizados')">Pedidos Finalizados</button>
+</div>
+
+<div id="dashboard" class="aba">
+    <h3>Dashboard</h3>
+    <p><strong>Total de Pedidos:</strong> <span id="totalPedidos">0</span></p>
+    <p><strong>Total Vendido (R$):</strong> <span id="totalValor">0.00</span></p>
+</div>
+
+<div id="cadastroPN" class="aba">
+    <h3>Cadastro de PNs</h3>
+    <input id="pn" placeholder="PN"><br>
+    <input id="produto" placeholder="Produto"><br>
+    <input id="preco" placeholder="Preço" type="number" step="0.01"><br>
+    <button onclick="salvarPN()">Salvar PN</button>
+
+    <h4>PNs Cadastrados:</h4>
+    <table class="compact-table">
+        <thead>
+            <tr>
+                <th>PN</th>
+                <th>Produto</th>
+                <th>Preço (R$)</th>
+            </tr>
+        </thead>
+        <tbody id="tabelaPNs"></tbody>
+    </table>
+</div>
+
+<div id="cadastroPedido" class="aba">
+    <h3>Colocar Pedido</h3>
+    <input id="cliente" placeholder="Cliente"><br>
+    <input id="data" type="date"><br>
+    <input id="formaPagamento" placeholder="Forma de Pagamento"><br>
+    <input id="numPedido" placeholder="Nº Pedido" readonly><br>
+
+    <h4>Adicionar Produtos:</h4>
+    <select id="selectPN"></select>
+    <button onclick="adicionarProduto()">Adicionar ao Pedido</button>
+    <ul id="listaProdutos"></ul>
+
+    <input id="vendedor" placeholder="Vendedor"><br>
+    <p><strong>Valor Total do Pedido:</strong> R$ <span id="valorTotal">0.00</span></p>
+    <button onclick="salvarPedido()">Salvar Pedido</button>
+</div>
+
+<div id="finalizados" class="aba">
+    <h3>Pedidos Finalizados</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Cliente</th>
+                <th>Data</th>
+                <th>Forma de Pagamento</th>
+                <th>Nº Pedido</th>
+                <th>Produtos (PNs)</th>
+                <th>Valor Total</th>
+                <th>Vendedor</th>
+            </tr>
+        </thead>
+        <tbody id="tabelaPedidos"></tbody>
+    </table>
+</div>
+
+<script>
+    // Configuração Firebase
+    const firebaseConfigPedidos = {
+        databaseURL: "https://teste1723-819a6-default-rtdb.firebaseio.com/"
+    };
+
+    const firebaseConfigProdutos = {
+        databaseURL: "https://cadastro-de-produto-95c22-default-rtdb.firebaseio.com/"
+    };
+
+    const appPedidos = firebase.initializeApp(firebaseConfigPedidos, "pedidosApp");
+    const dbPedidos = firebase.app("pedidosApp").database();
+
+    const appProdutos = firebase.initializeApp(firebaseConfigProdutos, "produtosApp");
+    const dbProdutos = firebase.app("produtosApp").database();
+
+    let produtosDisponiveis = [];
+    let produtosDoPedido = [];
+    let valorTotalPedido = 0;
+
+    function abrirAba(aba) {
+        document.querySelectorAll('.aba').forEach(div => div.classList.remove('ativa'));
+        document.getElementById(aba).classList.add('ativa');
+        if (aba === 'cadastroPedido') {
+            carregarProdutos();
+            preencherNumeroPedido();
+        }
+        if (aba === 'finalizados') listarPedidos();
+        if (aba === 'dashboard') carregarDashboard();
+        if (aba === 'cadastroPN') listarPNs();
+    }
+
+    function salvarPN() {
+        const pn = document.getElementById('pn').value.trim();
+        const produto = document.getElementById('produto').value.trim();
+        const preco = parseFloat(document.getElementById('preco').value.trim());
+
+        if (!pn || !produto || isNaN(preco)) {
+            alert('Preencha todos os campos!');
+            return;
+        }
+
+        dbProdutos.ref('produtos').push({
+            PN: pn,
+            Produto: produto,
+            Preço: preco
+        }).then(() => {
+            alert('PN cadastrado com sucesso!');
+            document.getElementById('pn').value = '';
+            document.getElementById('produto').value = '';
+            document.getElementById('preco').value = '';
+            listarPNs();
+        });
+    }
+
+    function listarPNs() {
+        dbProdutos.ref('produtos').once('value', snapshot => {
+            const tbody = document.getElementById('tabelaPNs');
+            tbody.innerHTML = '';
+            snapshot.forEach(child => {
+                const p = child.val();
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${p.PN}</td>
+                    <td>${p.Produto}</td>
+                    <td>R$ ${parseFloat(p.Preço).toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        });
+    }
+
+    function carregarProdutos() {
+        dbProdutos.ref('produtos').once('value', snapshot => {
+            const select = document.getElementById('selectPN');
+            select.innerHTML = '<option value="">Selecione um PN</option>';
+            produtosDisponiveis = [];
+
+            snapshot.forEach(child => {
+                const p = child.val();
+                produtosDisponiveis.push(p);
+                const option = document.createElement('option');
+                option.value = JSON.stringify(p);
+                option.textContent = `${p.PN} - ${p.Produto} (R$ ${p.Preço.toFixed(2)})`;
+                select.appendChild(option);
+            });
+        });
+    }
+
+    function preencherNumeroPedido() {
+        dbPedidos.ref('pedidos').once('value', snapshot => {
+            const quantidadePedidos = snapshot.numChildren();
+            document.getElementById('numPedido').value = quantidadePedidos + 1;
+        });
+    }
+
+    function adicionarProduto() {
+        const selected = document.getElementById('selectPN').value;
+        if (selected) {
+            const produto = JSON.parse(selected);
+            produtosDoPedido.push(produto);
+            valorTotalPedido += parseFloat(produto.Preço);
+            atualizarListaProdutos();
+        }
+    }
+
+    function atualizarListaProdutos() {
+        const ul = document.getElementById('listaProdutos');
+        ul.innerHTML = '';
+        produtosDoPedido.forEach((prod, index) => {
+            const li = document.createElement('li');
+            li.textContent = `${prod.PN} - ${prod.Produto} - R$ ${prod.Preço.toFixed(2)}`;
+            const btn = document.createElement('button');
+            btn.textContent = 'Remover';
+            btn.style.marginLeft = '10px';
+            btn.onclick = () => {
+                valorTotalPedido -= parseFloat(prod.Preço);
+                produtosDoPedido.splice(index, 1);
+                atualizarListaProdutos();
+            };
+            li.appendChild(btn);
+            ul.appendChild(li);
+        });
+        document.getElementById('valorTotal').textContent = valorTotalPedido.toFixed(2);
+    }
+
+    function salvarPedido() {
+        const cliente = document.getElementById('cliente').value.trim();
+        const data = document.getElementById('data').value.trim();
+        const formaPagamento = document.getElementById('formaPagamento').value.trim();
+        const numPedido = document.getElementById('numPedido').value.trim();
+        const vendedor = document.getElementById('vendedor').value.trim();
+
+        if (!cliente || !data || !formaPagamento || !numPedido || produtosDoPedido.length === 0 || !vendedor) {
+            alert('Preencha todos os campos e adicione pelo menos um produto!');
+            return;
+        }
+
+        dbPedidos.ref('pedidos').push({
+            Cliente: cliente,
+            Data: data,
+            "Forma de Pagamento": formaPagamento,
+            "Nº Pedido": numPedido,
+            PNs: produtosDoPedido,
+            Valor: valorTotalPedido,
+            Vendedor: vendedor
+        }).then(() => {
+            alert('Pedido salvo com sucesso!');
+            limparCamposPedido();
+            abrirAba('finalizados');
+        });
+    }
+
+    function limparCamposPedido() {
+        document.getElementById('cliente').value = '';
+        document.getElementById('data').value = '';
+        document.getElementById('formaPagamento').value = '';
+        document.getElementById('numPedido').value = '';
+        document.getElementById('vendedor').value = '';
+        produtosDoPedido = [];
+        valorTotalPedido = 0;
+        atualizarListaProdutos();
+    }
+
+    function listarPedidos() {
+        dbPedidos.ref('pedidos').once('value', snapshot => {
+            const tbody = document.getElementById('tabelaPedidos');
+            tbody.innerHTML = '';
+            snapshot.forEach(child => {
+                const p = child.val();
+                const tr = document.createElement('tr');
+                let listaPNs = '';
+                if (p.PNs && Array.isArray(p.PNs)) {
+                    listaPNs = p.PNs.map(pn => `${pn.PN} - ${pn.Produto} (R$ ${parseFloat(pn.Preço).toFixed(2)})`).join('<br>');
+                }
+                tr.innerHTML = `
+                    <td>${p.Cliente}</td>
+                    <td>${p.Data}</td>
+                    <td>${p["Forma de Pagamento"]}</td>
+                    <td>${p["Nº Pedido"]}</td>
+                    <td>${listaPNs}</td>
+                    <td>R$ ${parseFloat(p.Valor).toFixed(2)}</td>
+                    <td>${p.Vendedor}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        });
+    }
+
+    function carregarDashboard() {
+        dbPedidos.ref('pedidos').once('value', snapshot => {
+            let totalPedidos = 0;
+            let totalValor = 0;
+            snapshot.forEach(child => {
+                const p = child.val();
+                totalPedidos++;
+                totalValor += parseFloat(p.Valor) || 0;
+            });
+            document.getElementById('totalPedidos').textContent = totalPedidos;
+            document.getElementById('totalValor').textContent = totalValor.toFixed(2);
+        });
+    }
+
+    abrirAba('dashboard');
+</script>
+
+</body>
+</html>
