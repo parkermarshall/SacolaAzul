@@ -628,13 +628,13 @@
     // Notificação Telegram (texto simples)
     function enviarNotificacaoTelegram(pedido) {
       const token = '7959442480:AAFRI4e_dIX1rKk7aBlH-vYbDjfFWJ48C1Q';    // Substitua
-      const chatId = '6151253158';        // Substitua
+      const chatId = ['6151253158', '7941713551'];   // Substitua
       const listaPNsText = pedido.PNs.map(item => `${item.PN} x${item.quantidade}`).join(', ');
       const texto =
-        'Novo Pedido!\n' +
+        '✅Novo Pedido!\n' +
         'Nº: ' + pedido["Nº Pedido"] + '\n' +
         'Cliente: ' + pedido.Cliente + '\n' +
-        'Valor: R$ ' + parseFloat(pedido.Valor).toFixed(2) + '\n' +
+        '💰Valor: R$ ' + parseFloat(pedido.Valor).toFixed(2) + '\n' +
         'PNs: ' + listaPNsText + '\n' +
         'Vendedor: ' + pedido.Vendedor;
       const url = 'https://api.telegram.org/bot' + token +
