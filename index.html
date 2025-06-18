@@ -632,11 +632,11 @@
       const listaPNsText = pedido.PNs.map(item => `${item.PN} x${item.quantidade}`).join(', ');
       const texto =
         '✅Novo Pedido!\n' +
-        'Nº: ' + pedido["Nº Pedido"] + '\n' +
-        'Cliente: ' + pedido.Cliente + '\n' +
+        '🛒Nº: ' + pedido["Nº Pedido"] + '\n' +
+        '🤑Cliente: ' + pedido.Cliente + '\n' +
         '💰Valor: R$ ' + parseFloat(pedido.Valor).toFixed(2) + '\n' +
-        'PNs: ' + listaPNsText + '\n' +
-        'Vendedor: ' + pedido.Vendedor;
+        '🏷️PNs: ' + listaPNsText + '\n' +
+        '🏆Vendedor: ' + pedido.Vendedor;
       const url = 'https://api.telegram.org/bot' + token +
                   '/sendMessage?chat_id=' + chatId +
                   '&text=' + encodeURIComponent(texto);
